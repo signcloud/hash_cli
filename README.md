@@ -4,4 +4,4 @@
 pip install sqlalchemy
 
 **Step 2** 
-Run "python3 main.py help" for help 
+Run "python3 main.py help" for help  
