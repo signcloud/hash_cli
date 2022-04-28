@@ -4,7 +4,7 @@
 pip install sqlalchemy
 
 **Step 2:** 
-Run "python3 main.py" for help
+Run "./main.py" for help
 
 **Step 3:**
 ./main.py [path] [algorithm] [processes_per_core]
