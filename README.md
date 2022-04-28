@@ -8,7 +8,9 @@ Run "chmod +x main.py" to be able to run script like ./main.py
 
 **Step 3:**
 ./main.py [path] [algorithm] [processes_per_core]
+
 or just
+
 ./main.py or ./main.py help in order to get help
 
 **Example:**
