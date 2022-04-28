@@ -13,4 +13,5 @@ Run "./main.py" for help
 ./main.py ./ sha256 5
 
  **This will run script for folder "./" (can be provided path to file), hashing algorithm sha256 and 5 processes per CPU core
+ 
  Number of processes per core is optional parameter**
