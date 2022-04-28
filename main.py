@@ -40,6 +40,7 @@ def find_all_files(root_path):
     return files_list
 
 
+# Dictionary with available algorithms and its handlers
 algorithms = {'sha3_512': hashlib.sha3_512,
               'sha1': hashlib.sha1,
               'sha512': hashlib.sha512,
@@ -54,39 +55,44 @@ algorithms = {'sha3_512': hashlib.sha3_512,
 
 
 def get_hash_alg(filename, alg):
+    # Uncomment to see Processes starting counting hashes
     # print(
     #     'Counting hash for file: ' + filename + f' with process {multiprocessing.current_process().name} on'
     #                                             f' {time.ctime()}')
     with open(filename, 'rb') as f:
         m = algorithms[alg]()
         while True:
-            data = f.read(8192)
+            data = f.read()
             if not data:
                 break
             m.update(data)
-        return f'{m.hexdigest()} {filename}'
+        return f'{m.hexdigest()}|{filename}'
 
 
 def save_func(response):
     for line in response:
-        path_hash = line.split()
+        path_hash = line.split("|")
         query = session.query(Hash).filter(and_(Hash.path == path_hash[1], Hash.hash == path_hash[0]))
         if not query.first():
-            hash = Hash(path=path_hash[1], hash=path_hash[0])
-            session.add(hash)
+            hashsum = Hash(path=path_hash[1], hash=path_hash[0])
+            session.add(hashsum)
             session.commit()
+            # If found file with different hashsum
         exists = session.query(Hash).filter(and_(Hash.path == path_hash[1], Hash.hash != path_hash[0]))
         if exists.first():
             print(exists.first(), "changed to", path_hash[0])
-            choice = input("Update hash? ")
-            if choice == "yes":
+            choice = input("Update hashsum? ")
+
+            # Delete old hashsum and add new one if entered "y" ("yes")
+            if choice == "yes" or choice == "y":
                 session.execute(delete(Hash).where(Hash.path == path_hash[1]))
-                hash = Hash(path=path_hash[1], hash=path_hash[0])
-                session.add(hash)
+                hashsum = Hash(path=path_hash[1], hash=path_hash[0])
+                session.add(hashsum)
                 session.commit()
 
 
-if len(sys.argv) == 2 and sys.argv[1] == "help":
+# If called without parameters or "help" is passed
+if len(sys.argv) == 1 or sys.argv[1] == "help":
     print("Usage: python3 main.py __path__ __algorithm__\n"
           "Available algorithms: ")
     for al in algorithms:
@@ -95,16 +101,16 @@ if len(sys.argv) == 2 and sys.argv[1] == "help":
 if len(sys.argv) >= 3:
     path = sys.argv[1] if len(sys.argv) > 1 else './'
     algorithm = sys.argv[2]
-    # processes = int(sys.argv[2]) if len(sys.argv) > 2 else 5
+    processes = int(sys.argv[3]) if len(sys.argv) > 3 else 5
 
     if __name__ == '__main__':
         # print('Counting hashes in ' + path)
         st_time = time.time()
-        with multiprocessing.Pool(multiprocessing.cpu_count()) as p:
+        with multiprocessing.Pool(multiprocessing.cpu_count() * processes) as p:
             p.map_async(partial(get_hash_alg, alg=algorithm), find_all_files(path), callback=save_func)
             p.close()
             p.join()  #
         end_time = time.time()
         diff_time = end_time - st_time
-
+        # Uncomment the line below to display the time taken to calculate
         # print(diff_time, 'Processes/CPU core:', processes, 'CPU cores:', multiprocessing.cpu_count())
