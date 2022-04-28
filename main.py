@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 from functools import partial
 
 from sqlalchemy import create_engine
@@ -93,7 +94,7 @@ def save_func(response):
 
 # If called without parameters or "help" is passed
 if len(sys.argv) == 1 or sys.argv[1] == "help":
-    print("Usage: python3 main.py __path__ __algorithm__\n"
+    print("Usage: python3 main.py [path_to_file_or_folder] [algorithm] [processes_per_core]\n"
           "Available algorithms: ")
     for al in algorithms:
         print(al)
