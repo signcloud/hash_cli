@@ -28,6 +28,10 @@ class Hash(Base):
         return self.path
 
 
+if not os.path.isfile('hashes.db'):
+    Base.metadata.create_all(engine)
+
+
 def find_all_files(root_path):
     files_list = []
     if os.path.isfile(root_path):
@@ -94,14 +98,14 @@ def save_func(response):
 
 # If called without parameters or "help" is passed
 if len(sys.argv) == 1 or sys.argv[1] == "help":
-    print("Usage: python3 main.py [path_to_file_or_folder] [algorithm] [processes_per_core]\n"
+    print("Usage: hashcli [path_to_file_or_folder] [algorithm] [processes_per_core]\n"
           "Available algorithms: ")
     for al in algorithms:
         print(al)
 
-if len(sys.argv) >= 3:
+if len(sys.argv) >= 2:
     path = sys.argv[1] if len(sys.argv) > 1 else './'
-    algorithm = sys.argv[2]
+    algorithm = sys.argv[2] if len(sys.argv) > 2 else "sha256"
     processes = int(sys.argv[3]) if len(sys.argv) > 3 else 5
 
     if __name__ == '__main__':
