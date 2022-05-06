@@ -13,30 +13,17 @@ import os
 import time
 import sys
 
-Base = declarative_base()
-engine = create_engine('sqlite:///hashes.db', echo=False)
-session = sessionmaker(bind=engine)()
+import click
 
 
-class Hash(Base):
-    __tablename__ = 'hashes'
-    id = Column(Integer, primary_key=True)
-    path = Column(String)
-    hash = Column(String)
-
-    def __repr__(self):
-        return self.path
-
-
-if not os.path.isfile('hashes.db'):
-    Base.metadata.create_all(engine)
-
-
+# Function that collects all files to count hashes
+# If a file given as an argument, then add it to the list
 def find_all_files(root_path):
     files_list = []
+    # If argument is file then add it to the list
     if os.path.isfile(root_path):
         files_list.append(root_path)
-
+    # Walk through all the folders in path and append all the files to the list
     for root, dirs, files in os.walk(root_path, topdown=True):
         for name in files:
             filepath = os.path.join(root, name)
@@ -45,77 +32,148 @@ def find_all_files(root_path):
     return files_list
 
 
-# Dictionary with available algorithms and its handlers
-algorithms = {'sha3_512': hashlib.sha3_512,
-              'sha1': hashlib.sha1,
-              'sha512': hashlib.sha512,
-              # 'shake_128': hashlib.shake_128,
-              'sha3_224': hashlib.sha3_224,
-              'sha256': hashlib.sha256,
-              'sha3_256': hashlib.sha3_256,
-              'shake_256': hashlib.shake_256,
-              'blake2b': hashlib.blake2b,
-              'blake2s': hashlib.blake2s,
-              'md5': hashlib.md5}
-
-
+# Multiprocess function than counts hashes for files
 def get_hash_alg(filename, alg):
     # Uncomment to see Processes starting counting hashes
     # print(
     #     'Counting hash for file: ' + filename + f' with process {multiprocessing.current_process().name} on'
     #                                             f' {time.ctime()}')
-    with open(filename, 'rb') as f:
-        m = algorithms[alg]()
+    with open(filename, 'rb') as file:
+        memory = hashlib.new(alg)
         while True:
-            data = f.read()
+            data = file.read()
             if not data:
                 break
-            m.update(data)
-        return f'{m.hexdigest()}|{filename}'
+            memory.update(data)
+
+        # Returns hashsum|filename values for each file
+        # If algorithm name contains "shake" then limit number of letters in hash
+        if "shake" in alg:
+            return f'{memory.hexdigest(255)}|{filename}'
+        else:
+
+            return f'{memory.hexdigest()}|{filename}'
 
 
+# Function for saving results to database
 def save_func(response):
     for line in response:
         path_hash = line.split("|")
         query = session.query(Hash).filter(and_(Hash.path == path_hash[1], Hash.hash == path_hash[0]))
+
+        # If entry with filename and its hash not in database then add it
         if not query.first():
             hashsum = Hash(path=path_hash[1], hash=path_hash[0])
             session.add(hashsum)
             session.commit()
-            # If found file with different hashsum
+        # If found file with different hashsum
+        changed = 0
         exists = session.query(Hash).filter(and_(Hash.path == path_hash[1], Hash.hash != path_hash[0]))
         if exists.first():
             print(exists.first(), "changed to", path_hash[0])
             choice = input("Update hashsum? ")
-
+            changed += 1
+            # exit(0)
             # Delete old hashsum and add new one if entered "y" ("yes")
             if choice == "yes" or choice == "y":
                 session.execute(delete(Hash).where(Hash.path == path_hash[1]))
                 hashsum = Hash(path=path_hash[1], hash=path_hash[0])
                 session.add(hashsum)
                 session.commit()
+    # #
+    # if changed == 0:
+    #     print("No changes detected")
+    #     exit(0)
 
+
+# Basic Click configuration
+@click.command()
+@click.option("--check", "-c", help="Read SHA sums from the FILEs and check them")
+@click.option("--algorithm", "-a", help="Choose algorithm for hashing")
+@click.option("--processes", "-p", type=int, help="Processes per core")
+@click.option("--algorithms", "-al", is_flag=True, help="Display available algorithms")
+def main(check, algorithm, processes, algorithms=True):
+    """
+    Checks if hashes for files changed o
+    """
+    # If -al parameter entered print all guaranteed algorithms
+    if algorithms:
+        for i in hashlib.algorithms_guaranteed:
+            print(i)
+        exit(0)
+    # If algorithm is not set, then choose sha256 by default
+    if not algorithm:
+        algorithm = "sha256"
+    elif not check:
+        check = "./"
+
+    # If string passed to script through the conveyor with or without algorithm set
+    if check != "./" and len(sys.argv) == 1 or len(sys.argv) == 3 and algorithm in sys.argv:
+        for line in sys.stdin:
+            b = line.encode()
+            m = hashlib.new(algorithm)
+            m.update(b)
+    # If using shake_* algorithm then limit number of letters in hash
+            if "shake" in algorithm:
+                print(m.hexdigest(255))
+            else:
+                print(m.hexdigest())
+        sys.stdin.close()
+        exit(0)
+    # If -p parameter for number of processes per core not set, then by default make it = 1
+    if not processes:
+        processes = 1
+
+    # Mark start time of hashing process
+    st_time = time.time()
+    # Start hashing process for folder or file
+    with multiprocessing.Pool(multiprocessing.cpu_count() * processes) as process:
+        process.map_async(partial(get_hash_alg, alg=algorithm), find_all_files(check), callback=save_func)
+        process.close()
+        process.join()
+    end_time = time.time()
+    # Count time spent hashing folder
+    diff_time = end_time - st_time
+    # Uncomment the line below to display the time taken to calculate
+    # print(diff_time, 'Processes/CPU core:', processes, 'CPU cores:', multiprocessing.cpu_count())
+
+
+# Create ORM with sqlalchemy
+Base = declarative_base()
+engine = create_engine('sqlite:///hashes.db', echo=False)
+session = sessionmaker(bind=engine)()
+
+
+# Class for ORM hash table
+class Hash(Base):
+    __tablename__ = 'hashes'
+    id = Column(Integer, primary_key=True)
+    path = Column(String)
+    hash = Column(String)
+
+    # How the database object will be displayed
+    def __repr__(self):
+        return self.path
+
+
+# If database doesn't exist, create it
+if not os.path.isfile('hashes.db'):
+    Base.metadata.create_all(engine)
 
 # If called without parameters or "help" is passed
-if len(sys.argv) == 1 or sys.argv[1] == "help":
-    print("Usage: hashcli [path_to_file_or_folder] [algorithm] [processes_per_core]\n"
-          "Available algorithms: ")
-    for al in algorithms:
-        print(al)
 
-if len(sys.argv) >= 2:
-    path = sys.argv[1] if len(sys.argv) > 1 else './'
-    algorithm = sys.argv[2] if len(sys.argv) > 2 else "sha256"
-    processes = int(sys.argv[3]) if len(sys.argv) > 3 else 5
+# if len(sys.argv) == 1 or sys.argv[1] == "help":
+#     print("Usage: hashcli [path_to_file_or_folder] [algorithm] [processes_per_core]\n"
+#           "Available algorithms: ")
+#     for al in hashlib.algorithms_available:
+#         print(al)
+#
+# if len(sys.argv) >= 2:
+#     path = sys.argv[1] if len(sys.argv) > 1 else './'
+#     algorithm = sys.argv[2] if len(sys.argv) > 2 else "sha256"
+#     processes = int(sys.argv[3]) if len(sys.argv) > 3 else 5
 
-    if __name__ == '__main__':
-        # print('Counting hashes in ' + path)
-        st_time = time.time()
-        with multiprocessing.Pool(multiprocessing.cpu_count() * processes) as p:
-            p.map_async(partial(get_hash_alg, alg=algorithm), find_all_files(path), callback=save_func)
-            p.close()
-            p.join()  #
-        end_time = time.time()
-        diff_time = end_time - st_time
-        # Uncomment the line below to display the time taken to calculate
-        # print(diff_time, 'Processes/CPU core:', processes, 'CPU cores:', multiprocessing.cpu_count())
+if __name__ == '__main__':
+    main()
+
+    # print('Counting hashes in ' + path)

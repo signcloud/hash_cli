@@ -52,17 +52,19 @@ def get_hash_alg(filename, alg):
 
 # Function for saving results to file, checking if hashes changed
 # according to those in file
-def save_check_func(response="", file="", write=True, algorithm="sha256"):
+def save_check_func(response="", file="", algorithm="sha256"):
     # If -c parameter not set then just print the result
     if not file:
         for line in response:
             print(line)
-    # If -c filename is given and -w option is set
-    elif write and file:
-        with open(file, "w") as file:
-            for line in response:
-                file.write(line + "\n")
-
+    # If -c filename is given and got response
+    elif file and not os.path.isdir(file) and response:
+        if os.path.exists(file):
+            rewrite = input(f"File \"{file}\" already exists, rewrite file? (yes|no) ")
+        if rewrite == "yes" or rewrite == "y":
+            with open(file, "w") as file:
+                for line in response:
+                    file.write(line + "\n")
     # If function is called with filepath argument and got response from
     # multiprocessing
     elif not response:
@@ -83,7 +85,7 @@ def save_check_func(response="", file="", write=True, algorithm="sha256"):
                     print(i)
                 exit(1)
     else:
-        print("Use -w flag to rewrite hashes in file")
+        print(file, "is a directory")
 
 
 @click.command()
@@ -112,15 +114,13 @@ def main(write, file, check, algorithm, processes, algorithms=True):
 
     if check and not file:
         if os.path.exists(check):
-            save_check_func(file=check, write=write, algorithm=algorithm)
+            save_check_func(file=check, algorithm=algorithm)
         exit(0)
-
 
     # If string passed to script through the conveyor with or without
     # algorithm set
     if check != "./" and len(
-            sys.argv) == 1 or len(
-            sys.argv) == 3 and algorithm in sys.argv:
+            sys.argv) == 1 or len(sys.argv) == 3 and algorithm in sys.argv:
         for line in sys.stdin:
             b = line.encode()
             m = hashlib.new(algorithm)
@@ -148,8 +148,7 @@ def main(write, file, check, algorithm, processes, algorithms=True):
             find_all_files(file),
             callback=partial(
                 save_check_func,
-                file=check,
-                write=write))
+                file=check))
         process.close()
         process.join()
     end_time = time.time()
