@@ -115,6 +115,7 @@ def main(write, file, check, algorithm, processes, algorithms=True):
             save_check_func(file=check, write=write, algorithm=algorithm)
         exit(0)
 
+
     # If string passed to script through the conveyor with or without
     # algorithm set
     if check != "./" and len(
