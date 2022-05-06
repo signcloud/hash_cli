@@ -18,7 +18,7 @@ def find_all_files(root_path):
     if os.path.isfile(root_path):
         files_list.append(root_path)
     # Walk through all the folders in path and append all the files to the list
-    for root, dirs, files in os.walk(root_path, topdown=True):
+    for root, _, files in os.walk(root_path, topdown=True):
         for name in files:
             filepath = os.path.join(root, name)
             if os.path.exists(filepath):
@@ -33,7 +33,7 @@ def get_hash_alg(filename, alg):
     # print(
     #     'Counting hash for file: ' + filename + f' with process {multiprocessing.current_process().name} on'
     #                                             f' {time.ctime()}')
-    with open(filename, 'rb') as file:
+    with open(filename, "rb") as file:
         memory = hashlib.new(alg)
         while True:
             data = file.read()
@@ -45,28 +45,30 @@ def get_hash_alg(filename, alg):
         # If algorithm name contains "shake" then limit number of letters in
         # hash
         if "shake" in alg:
-            return f'{memory.hexdigest(255)}  {filename}'
+            return f"{memory.hexdigest(255)}  {filename}"
         else:
-            return f'{memory.hexdigest()}  {filename}'
+            return f"{memory.hexdigest()}  {filename}"
 
 
 # Function for saving results to file, checking if hashes changed
 # according to those in file
-def save_check_func(response="", file="", algorithm="sha256"):
+def save_check_func(response="", file="", algorithm="sha256", force=False):
     # If -c parameter not set then just print the result
     if not file:
         for line in response:
             print(line)
     # If -c filename is given and got response
+    # If function is called with filepath argument and got response from multiprocessing
     elif file and not os.path.isdir(file) and response:
-        if os.path.exists(file):
-            rewrite = input(f"File \"{file}\" already exists, rewrite file? (yes|no) ")
-        if rewrite == "yes" or rewrite == "y":
+        if not os.path.exists(file) or force:
             with open(file, "w") as file:
                 for line in response:
                     file.write(line + "\n")
-    # If function is called with filepath argument and got response from
-    # multiprocessing
+        else:
+            print("File already exists")
+            rewrite = input("Do you want to rewrite it? ")
+            if rewrite == "yes" or rewrite == "y":
+                save_check_func(response, file, force=True)
     elif not response:
         unmatched = []
         with open(file, "r") as file:
@@ -78,35 +80,33 @@ def save_check_func(response="", file="", algorithm="sha256"):
                 else:
                     unmatched.append(hash_file[1])
                     print(f"{hash_file[1]}:", "FAILED")
-            if len(unmatched) > 0:
+            count_unmached = len(unmatched)
+            if len(count_unmached) > 0:
                 print(
-                    f"{os.path.basename(__file__)}: WARNING: {len(unmatched)} computed checksums did NOT match:")
+                    f"{os.path.basename(__file__)}: WARNING: {count_unmached} computed checksums did NOT match:"
+                )
                 for i in unmatched:
                     print(i)
                 exit(1)
     else:
-        print(file, "is a directory")
+        print(f'"{file}" is a directory')
 
 
 @click.command()
 @click.argument("file", required=False, type=click.Path(exists=True))
-@click.option("--check", "-c",
-              help="Read SHA sums from the FILEs and check them")
+@click.option("--check", "-c", help="Read SHA sums from the FILEs and check them")
 @click.option("--algorithm", "-a", help="Choose algorithm for hashing")
 @click.option("--processes", "-p", type=int, help="Processes per core")
 @click.option("--write", "-w", is_flag=True, help="Save results to file")
-@click.option("--algorithms", "-al", is_flag=True,
-              help="Display available algorithms")
+@click.option("--algorithms", "-al", is_flag=True, help="Display available algorithms")
 def main(write, file, check, algorithm, processes, algorithms=True):
     """
-    Checks if hashes for files changed or not
+    Checks if hashes for files changed or not. By default uses sha256 algorithm.
     """
     # If -al option is set, print all guaranteed algorithms
     if algorithms:
-        for i in hashlib.algorithms_guaranteed:
+        for i in hashlib.algorithms_available:
             print(i)
-        diff = hashlib.algorithms_available - hashlib.algorithms_guaranteed
-        print("ADD:", diff)
         exit(0)
     # If algorithm is not set, then choose sha256 by default
     if not algorithm:
@@ -119,8 +119,12 @@ def main(write, file, check, algorithm, processes, algorithms=True):
 
     # If string passed to script through the conveyor with or without
     # algorithm set
-    if check != "./" and len(
-            sys.argv) == 1 or len(sys.argv) == 3 and algorithm in sys.argv:
+    if (
+        check != "./"
+        and len(sys.argv) == 1
+        or len(sys.argv) == 3
+        and algorithm in sys.argv
+    ):
         for line in sys.stdin:
             b = line.encode()
             m = hashlib.new(algorithm)
@@ -142,13 +146,10 @@ def main(write, file, check, algorithm, processes, algorithms=True):
     # Start hashing process for folder or file
     with multiprocessing.Pool(multiprocessing.cpu_count() * processes) as process:
         process.map_async(
-            partial(
-                get_hash_alg,
-                alg=algorithm),
+            partial(get_hash_alg, alg=algorithm),
             find_all_files(file),
-            callback=partial(
-                save_check_func,
-                file=check))
+            callback=partial(save_check_func, file=check),
+        )
         process.close()
         process.join()
     end_time = time.time()
@@ -158,5 +159,5 @@ def main(write, file, check, algorithm, processes, algorithms=True):
     # print(diff_time, 'Processes/CPU core:', processes, 'CPU cores:', multiprocessing.cpu_count())
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
