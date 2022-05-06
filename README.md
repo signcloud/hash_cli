@@ -4,7 +4,7 @@
 ln -s /absolute/path/to/hash.py /usr/bin/hashcli
 
 **Step 2:** 
-Run "chmod +x hash.py" to be able to run script like ./main.py
+Run "chmod +x hash.py" to be able to run script like hashcli
 
 **Step 3:**
 hashcli [path] -a [algorithm] -c [file_to_read_or_write] -p [processes_per_core] -w
