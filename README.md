@@ -20,7 +20,7 @@ hashcli ./ -a sha256 -p 5 -c hashes
 **and will save results to file "hashes"**
 **-c parameter says to what file to write to or read from results**
 
- **Number of processes  per core and algorithm is optional parameters**
+ **Number of processes per core and algorithm are optional parameters**
 
 To run tests type:
 
