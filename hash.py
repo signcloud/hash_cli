@@ -4,10 +4,37 @@ from functools import partial
 import hashlib
 import multiprocessing
 import os
-import time
+
+# import time
 import sys
 
 import click
+
+import logging
+
+logging.basicConfig(format="%(message)s", level=logging.DEBUG)
+logger = logging.getLogger()
+
+
+def check_file(file="", algorithm="sha256"):
+    unmatched = []
+    with open(file, "r") as file:
+        for line in file:
+            hash_file = line.strip().split("  ")
+            # Count hash for file and check if it changed
+            if get_hash_algorithm(hash_file[1].strip(), algorithm) in line:
+                logger.info(f"{hash_file[1]}: OK")
+            else:
+                unmatched.append(hash_file[1])
+                logger.info(f"{hash_file[1]}: FAILED")
+        count_unmatched = len(unmatched)
+        if count_unmatched > 0:
+            logger.info(
+                f"{os.path.basename(__file__)}: WARNING: {count_unmatched} computed checksums did NOT match:"
+            )
+            for i in unmatched:
+                logger.info(i)
+            exit(1)
 
 
 # Function that collects all files in folder
@@ -28,7 +55,7 @@ def find_all_files(root_path):
 
 # Multiprocess function than counts hashes for files
 # Read file and hash its data with given algorithm
-def get_hash_alg(filename, alg):
+def get_hash_algorithm(filename, alg):
     # Uncomment to see Processes starting counting hashes
     # print(
     #     'Counting hash for file: ' + filename + f' with process {multiprocessing.current_process().name} on'
@@ -52,11 +79,11 @@ def get_hash_alg(filename, alg):
 
 # Function for saving results to file, checking if hashes changed
 # according to those in file
-def save_check_func(response="", file="", algorithm="sha256", force=False):
+def save(response="", file="", algorithm="sha256", force=False):
     # If -c parameter not set then just print the result
     if not file:
         for line in response:
-            print(line)
+            logger.info(line)
     # If -c filename is given and got response
     # If function is called with filepath argument and got response from multiprocessing
     elif file and not os.path.isdir(file) and response:
@@ -65,31 +92,12 @@ def save_check_func(response="", file="", algorithm="sha256", force=False):
                 for line in response:
                     file.write(line + "\n")
         else:
-            print("File already exists")
+            logger.info("File already exists")
             rewrite = input("Do you want to rewrite it? ")
             if rewrite == "yes" or rewrite == "y":
-                save_check_func(response, file, force=True)
-    elif not response:
-        unmatched = []
-        with open(file, "r") as file:
-            for line in file:
-                hash_file = line.strip().split("  ")
-                # Count hash for file and check if it changed
-                if get_hash_alg(hash_file[1].strip(), algorithm) in line:
-                    print(f"{hash_file[1]}:", "OK")
-                else:
-                    unmatched.append(hash_file[1])
-                    print(f"{hash_file[1]}:", "FAILED")
-            count_unmached = len(unmatched)
-            if len(count_unmached) > 0:
-                print(
-                    f"{os.path.basename(__file__)}: WARNING: {count_unmached} computed checksums did NOT match:"
-                )
-                for i in unmatched:
-                    print(i)
-                exit(1)
+                save(response, file, force=True)
     else:
-        print(f'"{file}" is a directory')
+        logger.info(f'"{file}" is a directory')
 
 
 @click.command()
@@ -106,7 +114,7 @@ def main(write, file, check, algorithm, processes, algorithms=True):
     # If -al option is set, print all guaranteed algorithms
     if algorithms:
         for i in hashlib.algorithms_available:
-            print(i)
+            logger.info(i)
         exit(0)
     # If algorithm is not set, then choose sha256 by default
     if not algorithm:
@@ -114,7 +122,7 @@ def main(write, file, check, algorithm, processes, algorithms=True):
 
     if check and not file:
         if os.path.exists(check):
-            save_check_func(file=check, algorithm=algorithm)
+            check_file(file=check, algorithm=algorithm)
         exit(0)
 
     # If string passed to script through the conveyor with or without
@@ -131,9 +139,9 @@ def main(write, file, check, algorithm, processes, algorithms=True):
             m.update(b)
             # If using shake_* algorithm then limit number of letters in hash
             if "shake" in algorithm:
-                print(m.hexdigest(255))
+                logger.info(m.hexdigest(255))
             else:
-                print(m.hexdigest())
+                logger.info(m.hexdigest())
         sys.stdin.close()
         exit(0)
     # If -p parameter for number of processes per core not set, then by
@@ -142,19 +150,19 @@ def main(write, file, check, algorithm, processes, algorithms=True):
         processes = 1
 
     # Mark start time of hashing process
-    st_time = time.time()
+    # st_time = time.time()
     # Start hashing process for folder or file
     with multiprocessing.Pool(multiprocessing.cpu_count() * processes) as process:
         process.map_async(
-            partial(get_hash_alg, alg=algorithm),
+            partial(get_hash_algorithm, alg=algorithm),
             find_all_files(file),
-            callback=partial(save_check_func, file=check),
+            callback=partial(save, file=check),
         )
         process.close()
         process.join()
-    end_time = time.time()
+    # end_time = time.time()
     # Count time spent hashing folder
-    diff_time = end_time - st_time
+    # diff_time = end_time - st_time
     # Uncomment the line below to display the time taken to calculate
     # print(diff_time, 'Processes/CPU core:', processes, 'CPU cores:', multiprocessing.cpu_count())
 
