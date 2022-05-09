@@ -38,6 +38,7 @@ def check_file(file="", algorithm="sha256"):
 
 
 # Function that collects all files in folder
+
 # If a file given as an argument then add it to the list
 def find_all_files(root_path):
     files_list = []
