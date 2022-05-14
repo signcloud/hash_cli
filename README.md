@@ -25,3 +25,12 @@ hashcli ./ -a sha256 -p 5 -c hashes
 To run tests type:
 
 pytest -v
+
+**To install Docker containter type:**
+
+docker build -t hashcli .
+
+Then enter in order to get help:
+
+docker run hashcli --help
+
