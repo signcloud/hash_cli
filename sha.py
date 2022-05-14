@@ -27,7 +27,10 @@ class HashFiles:
         if self.root_path:
             self.hash_multiprocessing(self.root_path)
 
+    # Multiprocess function than counts hashes for files
+    # Read file and hash its data with given algorithm
     def get_hash_algorithm(self, file):
+        # Uncomment lines below to see multiprocess info
         # print(
         #     'Counting hash for file: ' + file + f' with process {multiprocessing.current_process().name} on'
         #                                             f' {time.ctime()}')
@@ -57,7 +60,7 @@ class HashFiles:
 
     def hash_multiprocessing(self, file: str, check=""):
         with multiprocessing.Pool(
-            multiprocessing.cpu_count() * self.processes
+                multiprocessing.cpu_count() * self.processes
         ) as process:
             process.map_async(
                 self.get_hash_algorithm,
@@ -121,7 +124,7 @@ class HashFiles:
     "--check",
     "-c",
     help="Read SHA sums from the FILEs and check them or write to file if file (or folder) "
-    "argument is given",
+         "argument is given",
 )
 @click.option("--algorithm", "-a", help="Choose algorithm for hashing")
 @click.option("--processes", "-p", type=int, help="Processes per core")
