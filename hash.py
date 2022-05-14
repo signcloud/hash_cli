@@ -79,7 +79,7 @@ def get_hash_algorithm(filename, alg):
 
 # Function for saving results to file, checking if hashes changed
 # according to those in file
-def save(response="", file="", algorithm="sha256", force=False):
+def save(response, file="", force=False):
     # If -c parameter not set then just print the result
     if not file:
         for line in response:
@@ -87,6 +87,7 @@ def save(response="", file="", algorithm="sha256", force=False):
     # If -c filename is given and got response
     # If function is called with filepath argument and got response from multiprocessing
     elif file and not os.path.isdir(file) and response:
+        # Write to file if file doesn't exist or function called with force parameter set to True
         if not os.path.exists(file) or force:
             with open(file, "w") as file:
                 for line in response:
@@ -102,12 +103,12 @@ def save(response="", file="", algorithm="sha256", force=False):
 
 @click.command()
 @click.argument("file", required=False, type=click.Path(exists=True))
-@click.option("--check", "-c", help="Read SHA sums from the FILEs and check them")
+@click.option("--check", "-c", help="Read SHA sums from the FILEs and check them or write to file if file (or folder) "
+                                    "argument is given")
 @click.option("--algorithm", "-a", help="Choose algorithm for hashing")
 @click.option("--processes", "-p", type=int, help="Processes per core")
-@click.option("--write", "-w", is_flag=True, help="Save results to file")
 @click.option("--algorithms", "-al", is_flag=True, help="Display available algorithms")
-def main(write, file, check, algorithm, processes, algorithms=True):
+def main(file, check, algorithm, processes, algorithms=True):
     """
     Checks if hashes for files changed or not. By default uses sha256 algorithm.
     """
@@ -128,10 +129,10 @@ def main(write, file, check, algorithm, processes, algorithms=True):
     # If string passed to script through the conveyor with or without
     # algorithm set
     if (
-        check != "./"
-        and len(sys.argv) == 1
-        or len(sys.argv) == 3
-        and algorithm in sys.argv
+            check != "./"
+            and len(sys.argv) == 1
+            or len(sys.argv) == 3
+            and algorithm in sys.argv
     ):
         for line in sys.stdin:
             b = line.encode()

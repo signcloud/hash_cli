@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 from functools import partial
+from typing import Any
 
 from sqlalchemy import create_engine
 from sqlalchemy import Column, String, Integer
@@ -10,7 +11,6 @@ from sqlalchemy.orm.session import sessionmaker
 import hashlib
 import multiprocessing
 import os
-import time
 import sys
 
 import click
@@ -38,7 +38,7 @@ def get_hash_alg(filename, alg):
     # print(
     #     'Counting hash for file: ' + filename + f' with process {multiprocessing.current_process().name} on'
     #                                             f' {time.ctime()}')
-    with open(filename, 'rb') as file:
+    with open(filename, "rb") as file:
         memory = hashlib.new(alg)
         while True:
             data = file.read()
@@ -49,17 +49,19 @@ def get_hash_alg(filename, alg):
         # Returns hashsum|filename values for each file
         # If algorithm name contains "shake" then limit number of letters in hash
         if "shake" in alg:
-            return f'{memory.hexdigest(255)}|{filename}'
+            return f"{memory.hexdigest(255)}|{filename}"
         else:
 
-            return f'{memory.hexdigest()}|{filename}'
+            return f"{memory.hexdigest()}|{filename}"
 
 
 # Function for saving results to database
 def save_func(response):
     for line in response:
         path_hash = line.split("|")
-        query = session.query(Hash).filter(and_(Hash.path == path_hash[1], Hash.hash == path_hash[0]))
+        query = session.query(Hash).filter(
+            and_(Hash.path == path_hash[1], Hash.hash == path_hash[0])
+        )
 
         # If entry with filename and its hash not in database then add it
         if not query.first():
@@ -68,7 +70,9 @@ def save_func(response):
             session.commit()
         # If found file with different hashsum
         changed = 0
-        exists = session.query(Hash).filter(and_(Hash.path == path_hash[1], Hash.hash != path_hash[0]))
+        exists = session.query(Hash).filter(
+            and_(Hash.path == path_hash[1], Hash.hash != path_hash[0])
+        )
         if exists.first():
             print(exists.first(), "changed to", path_hash[0])
             choice = input("Update hashsum? ")
@@ -108,12 +112,17 @@ def main(check, algorithm, processes, algorithms=True):
         check = "./"
 
     # If string passed to script through the conveyor with or without algorithm set
-    if check != "./" and len(sys.argv) == 1 or len(sys.argv) == 3 and algorithm in sys.argv:
+    if (
+        check != "./"
+        and len(sys.argv) == 1
+        or len(sys.argv) == 3
+        and algorithm in sys.argv
+    ):
         for line in sys.stdin:
             b = line.encode()
             m = hashlib.new(algorithm)
             m.update(b)
-    # If using shake_* algorithm then limit number of letters in hash
+            # If using shake_* algorithm then limit number of letters in hash
             if "shake" in algorithm:
                 print(m.hexdigest(255))
             else:
@@ -125,28 +134,26 @@ def main(check, algorithm, processes, algorithms=True):
         processes = 1
 
     # Mark start time of hashing process
-    st_time = time.time()
     # Start hashing process for folder or file
     with multiprocessing.Pool(multiprocessing.cpu_count() * processes) as process:
-        process.map_async(partial(get_hash_alg, alg=algorithm), find_all_files(check), callback=save_func)
+        process.map_async(
+            partial(get_hash_alg, alg=algorithm),
+            find_all_files(check),
+            callback=save_func,
+        )
         process.close()
         process.join()
-    end_time = time.time()
-    # Count time spent hashing folder
-    diff_time = end_time - st_time
-    # Uncomment the line below to display the time taken to calculate
-    # print(diff_time, 'Processes/CPU core:', processes, 'CPU cores:', multiprocessing.cpu_count())
 
 
 # Create ORM with sqlalchemy
-Base = declarative_base()
-engine = create_engine('sqlite:///hashes.db', echo=False)
+Base: Any = declarative_base()
+engine = create_engine("sqlite:///hashes.db", echo=False)
 session = sessionmaker(bind=engine)()
 
 
 # Class for ORM hash table
 class Hash(Base):
-    __tablename__ = 'hashes'
+    __tablename__ = "hashes"
     id = Column(Integer, primary_key=True)
     path = Column(String)
     hash = Column(String)
@@ -157,7 +164,7 @@ class Hash(Base):
 
 
 # If database doesn't exist, create it
-if not os.path.isfile('hashes.db'):
+if not os.path.isfile("hashes.db"):
     Base.metadata.create_all(engine)
 
 # If called without parameters or "help" is passed
@@ -173,7 +180,7 @@ if not os.path.isfile('hashes.db'):
 #     algorithm = sys.argv[2] if len(sys.argv) > 2 else "sha256"
 #     processes = int(sys.argv[3]) if len(sys.argv) > 3 else 5
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
 
     # print('Counting hashes in ' + path)
