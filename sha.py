@@ -60,7 +60,7 @@ class HashFiles:
 
     def hash_multiprocessing(self, file: str, check=""):
         with multiprocessing.Pool(
-                multiprocessing.cpu_count() * self.processes
+            multiprocessing.cpu_count() * self.processes
         ) as process:
             process.map_async(
                 self.get_hash_algorithm,
@@ -124,7 +124,7 @@ class HashFiles:
     "--check",
     "-c",
     help="Read SHA sums from the FILEs and check them or write to file if file (or folder) "
-         "argument is given",
+    "argument is given",
 )
 @click.option("--algorithm", "-a", help="Choose algorithm for hashing")
 @click.option("--processes", "-p", type=int, help="Processes per core")
