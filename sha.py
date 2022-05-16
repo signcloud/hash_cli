@@ -154,7 +154,7 @@ def main(file, check, algorithm, processes, algorithms=True):
 
     if check and not file:
         if os.path.exists(check):
-            check_file = HashFiles(file, check, algorithm, processes)
+            check_file = HashFiles(file, check, algorithm, processes) 
             check_file.check_file(file=check)
         exit(0)
 
