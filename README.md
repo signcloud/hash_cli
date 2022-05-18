@@ -37,3 +37,5 @@ docker run hashcli --help
 Run:
 docker run -v /home/dzhdanov@scnsoft.com/Projects/hash:/usr/app/src/dir hashcli ./dir/test
 
+=======
+Run: docker run -v /home/dzhdanov@scnsoft.com/Projects/hash:/usr/app/src/dir hashcli ./dir/test
