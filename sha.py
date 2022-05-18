@@ -27,7 +27,10 @@ class HashFiles:
         if self.root_path:
             self.hash_multiprocessing(self.root_path)
 
+    # Multiprocess function than counts hashes for files
+    # Read file and hash its data with given algorithm
     def get_hash_algorithm(self, file):
+        # Uncomment lines below to see multiprocess info
         # print(
         #     'Counting hash for file: ' + file + f' with process {multiprocessing.current_process().name} on'
         #                                             f' {time.ctime()}')

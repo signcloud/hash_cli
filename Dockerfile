@@ -1,6 +1,11 @@
 FROM python:3.8
+
 WORKDIR /usr/app/src
-ADD requirements.txt .
+
+COPY ./requirements.txt /usr/app/src/requirements.txt
+
 RUN pip install -r requirements.txt
-ADD sha.py .
-ENTRYPOINT ["python", "sha.py"]
+
+COPY sha.py ./
+
+ENTRYPOINT ["python3", "./sha.py"]
