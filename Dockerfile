@@ -1,3 +1,5 @@
+FROM python:3.8
+
 WORKDIR /usr/app/src
 
 COPY ./requirements.txt /usr/app/src/requirements.txt
