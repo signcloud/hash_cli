@@ -62,7 +62,7 @@ class HashFiles:
             process.map_async(
                 self.get_hash_algorithm,
                 self.find_files(),
-                callback=partial(self.save, check=self.check),
+                callback=partial(self.save_hashes, check=self.check),
             )
             process.close()
             process.join()
@@ -70,7 +70,7 @@ class HashFiles:
     def hash_file(self):
         self.hash_multiprocessing(self.root_path)
 
-    def save(self, response, check, force=False):
+    def save_hashes(self, response, check, force=False):
         if not check:
             for line in response:
                 self.result += line + "\n"
@@ -89,7 +89,10 @@ class HashFiles:
                 logger.info("File already exists")
                 rewrite = input("Do you want to rewrite it? ")
                 if rewrite == "yes" or rewrite == "y":
-                    self.save(response, check, force=True)
+                    self.save_hashes(response, check, force=True)
+        else:
+            logger.info(check + " is a directory")
+        return response
 
     def check_file(self, file=""):
         unmatched = []
@@ -110,6 +113,7 @@ class HashFiles:
                 for i in unmatched:
                     logger.info(i)
                 exit(1)
+            return unmatched
 
     def __str__(self):
         return self.result.strip()
