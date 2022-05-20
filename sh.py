@@ -2,11 +2,10 @@
 import time
 import hashlib
 import multiprocessing
+from multiprocessing.pool import ThreadPool
+import threading
 import os
 import sys
-import threading
-# from multiprocessing.dummy import Pool as ThreadPool
-from multiprocessing import Pool as ThreadPool
 
 from functools import partial
 
@@ -14,15 +13,12 @@ import click
 
 import logging
 
-debug = False
-
-
 logging.basicConfig(format="%(message)s", level=logging.DEBUG)
 logger = logging.getLogger()
 
 
 class HashFiles:
-    def __init__(self, root_path, check, algorithm, processes=1):
+    def __init__(self, root_path, check, algorithm, processes):
         self.check = check
         self.root_path = root_path
         self.algorithm = algorithm
@@ -34,19 +30,19 @@ class HashFiles:
 
         if self.algorithm not in hashlib.algorithms_available:
             logger.info("Wrong algorithm")
+            # exit(0)
 
         if not processes:
             self.processes = 1
         if self.root_path:
-            self.hash_multiprocessing()
+            self.find_and_hash()
 
     def get_hash_algorithm(self, file):
-        if debug:
-            if multiprocessing.current_process().name == "MainProcess":
-                print(f'Counting hash for file: {file} with thread {threading.current_thread().name} on {time.ctime()}')
-            else:
-                print(
-                    f'Counting hash for file: {file} with process {multiprocessing.current_process().name} on {time.ctime()}')
+        if self.algorithm not in hashlib.algorithms_available:
+            exit(1)
+        # print(
+        #     'Counting hash for file: ' + file + f' with thread {multiprocessing.current_process().name} on'
+        #     f' {time.ctime()}')
 
         with open(file, "rb") as hash_file:
             mem = hashlib.new(self.algorithm)
@@ -61,7 +57,7 @@ class HashFiles:
         else:
             return f"{mem.hexdigest()}  {file}"
 
-    def find_files(self):
+    def find_and_hash(self):
         files_list = []
         # If argument is file then add it to the list
         if os.path.isfile(self.root_path):
@@ -72,23 +68,27 @@ class HashFiles:
                 filepath = os.path.join(root, name)
                 if os.path.exists(filepath):
                     files_list.append(filepath)
-        return files_list
+        for file in files_list:
+            res = self.get_hash_algorithm(file)
+            self.result.append(res)
 
-    def hash_multiprocessing(self):
+        self.save_hashes(response=self.result, check=self.check)
+        return self.result
+
+    def hash_multiprocessing(self, file: str, check=""):
         with ThreadPool(
                 multiprocessing.cpu_count() * self.processes
         ) as process:
             process.map_async(
                 self.get_hash_algorithm,
-                self.find_files(),
+                self.find_and_hash(),
                 callback=partial(self.save_hashes, check=self.check),
             )
             process.close()
             process.join()
-        return process
 
     def save_hashes(self, response, check="", force=False):
-        if not check:
+        if not check and response:
             for line in response:
                 logger.info(line)
             # If -c filename is given and got response
@@ -119,6 +119,7 @@ class HashFiles:
                 else:
                     unmatched.append(hash_file[1])
                     logger.info(f"{hash_file[1]}: FAILED")
+
             count_unmatched = len(unmatched)
             if count_unmatched > 0:
                 logger.info(
@@ -126,7 +127,6 @@ class HashFiles:
                 )
                 for i in unmatched:
                     logger.info(i)
-
             return unmatched
 
     def __str__(self):
@@ -146,7 +146,7 @@ class HashFiles:
 @click.option("--algorithms", "-al", is_flag=True, help="Display available algorithms")
 def main(file, check, algorithm, processes, algorithms=True):
     """
-    Checks if hashes for files changed or not. By default, uses sha256 algorithm.
+    Checks if hashes for files changed or not. By default uses sha256 algorithm.
     """
     start_time = time.time()
     if algorithms:
@@ -168,6 +168,7 @@ def main(file, check, algorithm, processes, algorithms=True):
             else:
                 logger.info(m.hexdigest())
         sys.stdin.close()
+        exit(0)
 
     unmatched = []
     if check and not file:
@@ -176,6 +177,7 @@ def main(file, check, algorithm, processes, algorithms=True):
             unmatched = check_file.check_file(file=check)
 
     HashFiles(file, check, algorithm, processes)
+
     end_time = time.time()
     diff_time = end_time - start_time
     logger.info("Time spent counting: " + str(diff_time))
